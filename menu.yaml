@@ -1,0 +1,220 @@
+openapi: 3.0.3
+info:
+  title: Example - OpenAPI 3.0
+  description: This is a demo Example
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/
+
+x-states:
+  - EmptyMenu
+  - PartialMenu
+  - FullMenu
+
+x-init-state: EmptyMenu
+
+x-registers:
+  monday:
+    type: $entities.MenuItem
+  tuesday:
+    type: $entities.MenuItem
+  wednesday:
+    type: $entities.MenuItem
+  thursday:
+    type: $entities.MenuItem
+  friday:
+    type: $entities.MenuItem
+  saturday:
+    type: $entities.MenuItem
+  sunday:
+    type: $entities.MenuItem
+
+x-entities:
+  MenuItem:
+    type: object
+    properties:
+      day:
+        type: string
+        enum:
+          [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+          ]
+      food:
+        type: string
+
+    required: [day, food]
+    x-pk: day
+
+x-alphabet:
+  out:
+    - name: emptyList
+      value: []
+  guards:
+    - name: validMenuItem
+      params:
+        - name: reqBody
+          type: object
+          properties:
+            day:
+              type: string
+              enum:
+                [
+                  "monday",
+                  "tuesday",
+                  "wednesday",
+                  "thursday",
+                  "friday",
+                  "saturday",
+                  "sunday",
+                ]
+            food:
+              type: string
+      asserts: # list of strings representing conditions joined by "and", i.e. all conditions must be true for the guard not to fail
+        - memberOf({ $params.reqBody.day }, { ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] }) # memberOf is a built in function
+        - $params.reqBody.food != "" # boolean expression - no need for built in function/keyword
+    - name: foodForDayExists
+      params:
+        - name: day
+          type: string
+          enum:
+            [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday",
+            ]
+      asserts:
+        - registerIsNotNull({ getRegisterByKey({ $params.day }) })
+
+paths:
+  /weekmenu:
+    post:
+      summary: Add a menu item for a specific day
+      operationId: addMenuItem
+      requestBody:
+        description: Day and food item to add
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                day:
+                  type: string
+                  enum:
+                    [
+                      "monday",
+                      "tuesday",
+                      "wednesday",
+                      "thursday",
+                      "friday",
+                      "saturday",
+                      "sunday",
+                    ]
+                food:
+                  type: string
+
+      x-guards:
+        # operation-wide guards - just syntactic sugar
+        # saves the user time by not having to write additional transitions to incorporate operation-wide guards
+        # transitions will be expanded during parsing
+        - tries: validMenuItem($requestBody)
+          fails: httpException(400, 'Bad request')
+
+      x-transitions:
+        - from: EmptyMenu
+          to: PartialMenu
+          update: setRegister( getRegisterByKey({ $requestBody.day }), construct({ $entities.MenuItem }, { $requestBody })
+          output: getRegisterByKey({ $requestBody.day })
+
+        - from: PartialMenu
+          to: FullMenu
+          conditions:
+            - not registerIsNotNull(getRegisterByKey({ $requestBody.day })
+          update: setRegister( getRegisterByKey({ $requestBody.day }), construct({ $entities.MenuItem }, { $requestBody })
+          output: getRegisterByKey({ $requestBody.day })
+
+        - from: PartialMenu
+          to: PartialMenu
+          conditions:
+            - registerIsNotNull(getRegisterByKey({ $requestBody.day })
+          update: setRegister( getRegisterByKey({ $requestBody.day }), construct({ $entities.MenuItem }, { $requestBody })
+          output: getRegisterByKey({ $requestBody.day }, {201})
+
+        - from: FullMenu
+          to: FullMenu
+          update: setRegister( getRegisterByKey({ $requestBody.day }), construct({ $entities.MenuItem }, { $requestBody })
+          output: getRegisterByKey({ $requestBody.day })
+
+
+      responses:
+        "201":
+          description: Menu item added successfully
+        "422":
+          description: Bad request
+
+    get:
+      summary: Get the menu for a specific day
+      operationId: getFoodForDay
+      parameters:
+        - in: query
+          name: day
+          required: true
+          schema:
+            type: string
+            enum:
+              [
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+              ]
+
+      x-guards:
+        - tries: foodForDayExists($params.day)
+          fails: httpException(404, 'Menu not found')
+
+      x-idempotent: true
+      x-transitions:
+        - from: EmptyMenu
+          output: httpException(404, 'Menu not found')
+        - from: PartialMenu | FullMenu
+          output: getField({ food }, { getRegisterByKey({ $params.day }) })
+
+      responses:
+        "200":
+          description: Menu for the specified day
+        "404":
+          description: Menu not found
+
+components:
+  schemas:
+    MenuItem:
+      type: object
+      properties:
+        day:
+          type: string
+          enum:
+            [
+              "monday",
+              "tuesday",
+              "wednesday",
+              "thursday",
+              "friday",
+              "saturday",
+              "sunday",
+            ]
+        food:
+          type: string
