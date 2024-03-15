@@ -99,7 +99,7 @@ x-alphabet:
               "sunday",
             ]
       asserts:
-        - registerIsNotNull({ getRegisterByKey({ $params.day }) })
+        - not registerIsNull({ getRegisterByKey({ $params.day }) })
 
 paths:
   /weekmenu:
@@ -145,14 +145,14 @@ paths:
         - from: PartialMenu
           to: FullMenu
           conditions:
-            - not registerIsNotNull(getRegisterByKey({ $requestBody.day })
+            - registerIsNull(getRegisterByKey({ $requestBody.day })
           update: setRegister( getRegisterByKey({ $requestBody.day }), construct({ $entities.MenuItem }, { $requestBody })
           output: getRegisterByKey({ $requestBody.day })
 
         - from: PartialMenu
           to: PartialMenu
           conditions:
-            - registerIsNotNull(getRegisterByKey({ $requestBody.day })
+            - not registerIsNull(getRegisterByKey({ $requestBody.day })
           update: setRegister( getRegisterByKey({ $requestBody.day }), construct({ $entities.MenuItem }, { $requestBody })
           output: getRegisterByKey({ $requestBody.day }, {201})
 

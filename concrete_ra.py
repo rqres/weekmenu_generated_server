@@ -37,25 +37,25 @@ class GetFoodForDayAction(
                 next_state = WeekMenuStates.EMPTY_MENU
                 return HttpException(400, "Bad request"), next_state
 
-            case WeekMenuStates.EMPTY_MENU if ValidDayStringGuard(p0).check() and not FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.EMPTY_MENU if not FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.EMPTY_MENU
                 return HttpException(404, "Menu not found"), next_state
 
-            case WeekMenuStates.EMPTY_MENU if ValidDayStringGuard(p0).check() and FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.EMPTY_MENU:
                 next_state = WeekMenuStates.EMPTY_MENU
                 return HttpException(404, "Menu not found"), next_state
-            
+
             # ----------------
 
             case WeekMenuStates.PARTIAL_MENU if not ValidDayStringGuard(p0).check():
                 next_state = WeekMenuStates.PARTIAL_MENU
                 return HttpException(400, "Bad request"), next_state
-            
-            case WeekMenuStates.PARTIAL_MENU if ValidDayStringGuard(p0).check() and not FoodForDayExistsGuard(p0).check():
+
+            case WeekMenuStates.PARTIAL_MENU if not FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.PARTIAL_MENU
                 return HttpException(404, "Menu not found"), next_state
 
-            case WeekMenuStates.PARTIAL_MENU if ValidDayStringGuard(p0).check() and FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.PARTIAL_MENU:
                 next_state = WeekMenuStates.PARTIAL_MENU
                 return LiteralOutputSymbol(registers[p0].register.food), next_state
 
@@ -64,17 +64,14 @@ class GetFoodForDayAction(
             case WeekMenuStates.FULL_MENU if not ValidDayStringGuard(p0).check():
                 next_state = WeekMenuStates.FULL_MENU
                 return HttpException(400, "Bad request"), next_state
-            
-            case WeekMenuStates.FULL_MENU if ValidDayStringGuard(p0).check and not FoodForDayExistsGuard(p0).check():
+
+            case WeekMenuStates.FULL_MENU if not FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.FULL_MENU
                 return HttpException(404, "Menu not found"), next_state
 
-            case WeekMenuStates.FULL_MENU if ValidDayStringGuard(p0).check() and FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.FULL_MENU:
                 next_state = WeekMenuStates.FULL_MENU
                 return LiteralOutputSymbol(registers[p0].register.food), next_state
-
-            case _:
-                raise Exception("Should not happen")
 
 
 class AddMenuItemAction(Action[[dict[str, Any]], WeekMenuStates]):
@@ -86,53 +83,50 @@ class AddMenuItemAction(Action[[dict[str, Any]], WeekMenuStates]):
         p0: dict[str, Any],
     ) -> tuple[OutputSymbol, WeekMenuStates]:
         match current_state:
-            case WeekMenuStates.EMPTY_MENU if ValidMenuItemGuard(p0).check():
-                next_state = WeekMenuStates.PARTIAL_MENU
-
-                registers[p0["day"]].register = MenuItem(pk="dummy", **p0)
-
-                return LiteralOutputSymbol(registers[p0["day"]].register), next_state
-
             case WeekMenuStates.EMPTY_MENU if not ValidMenuItemGuard(p0).check():
                 next_state = WeekMenuStates.EMPTY_MENU
                 return HttpException(400, "Bad request"), next_state
 
-            case WeekMenuStates.PARTIAL_MENU if ValidMenuItemGuard(
-                p0
-            ).check() and registers[p0["day"]].is_null:
+            case WeekMenuStates.EMPTY_MENU:
+                next_state = WeekMenuStates.PARTIAL_MENU
+
+                registers[p0["day"]].register = MenuItem(pk="dummy", **p0)
+
+                return LiteralOutputSymbol(registers[p0["day"]].register), next_state
+
+            # ----------------
+
+            case WeekMenuStates.PARTIAL_MENU if not ValidMenuItemGuard(p0).check():
+                next_state = WeekMenuStates.PARTIAL_MENU
+                return HttpException(400, "Bad request"), next_state
+
+            case WeekMenuStates.PARTIAL_MENU if registers[p0["day"]].is_null:
+
                 next_state = WeekMenuStates.FULL_MENU
 
                 registers[p0["day"]].register = MenuItem(pk="dummy", **p0)
 
                 return LiteralOutputSymbol(registers[p0["day"]].register), next_state
 
-            case WeekMenuStates.PARTIAL_MENU if not ValidMenuItemGuard(p0).check():
-                next_state = WeekMenuStates.PARTIAL_MENU
-                return HttpException(400, "Bad request"), next_state
-
-            case WeekMenuStates.PARTIAL_MENU if ValidMenuItemGuard(
-                p0
-            ).check() and not registers[p0["day"]].is_null:
+            case WeekMenuStates.PARTIAL_MENU if not registers[p0["day"]].is_null:
                 next_state = WeekMenuStates.PARTIAL_MENU
 
                 registers[p0["day"]].register = MenuItem(pk="dummy", **p0)
 
                 return LiteralOutputSymbol(registers[p0["day"]].register), next_state
 
-            case WeekMenuStates.PARTIAL_MENU if not ValidMenuItemGuard(p0).check():
-                next_state = WeekMenuStates.PARTIAL_MENU
-                return HttpException(400, "Bad request"), next_state
-
-            case WeekMenuStates.FULL_MENU if ValidMenuItemGuard(p0).check():
-                next_state = WeekMenuStates.FULL_MENU
-
-                registers[p0["day"]].register = MenuItem(pk="dummy", **p0)
-
-                return LiteralOutputSymbol(registers[p0["day"]].register), next_state
+            # ----------------
 
             case WeekMenuStates.FULL_MENU if not ValidMenuItemGuard(p0).check():
                 next_state = WeekMenuStates.FULL_MENU
                 return HttpException(400, "Bad request"), next_state
+
+            case WeekMenuStates.FULL_MENU:
+                next_state = WeekMenuStates.FULL_MENU
+
+                registers[p0["day"]].register = MenuItem(pk="dummy", **p0)
+
+                return LiteralOutputSymbol(registers[p0["day"]].register), next_state
 
             case _:
                 raise Exception("Should not happen")
