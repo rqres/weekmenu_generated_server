@@ -33,3 +33,21 @@ class FoodForDayExistsGuard(Guard):
         cond1 = not registers[self.day].is_null
 
         return cond1
+
+class ValidDayStringGuard(Guard):
+    def __init__(self, day: str):
+        self.day = day
+
+    @override
+    def check(self) -> bool:
+        cond1 = self.day in [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+
+        return cond1

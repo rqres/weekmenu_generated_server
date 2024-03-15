@@ -1,6 +1,6 @@
 from typing import Any, Literal, override
 
-from guards import FoodForDayExistsGuard, ValidMenuItemGuard
+from guards import FoodForDayExistsGuard, ValidMenuItemGuard, ValidDayStringGuard
 from register_automaton import Action, OutputSymbol, RegisterAutomaton, Repository
 from setup import MenuItem, WeekMenuStates, init_state, registers
 from symbols import HttpException, LiteralOutputSymbol
@@ -32,30 +32,45 @@ class GetFoodForDayAction(
         ],
     ) -> tuple[OutputSymbol, WeekMenuStates]:
         match current_state:
-            case WeekMenuStates.EMPTY_MENU if not FoodForDayExistsGuard(p0).check():
+
+            case WeekMenuStates.EMPTY_MENU if not ValidDayStringGuard(p0).check():
+                next_state = WeekMenuStates.EMPTY_MENU
+                return HttpException(400, "Bad request"), next_state
+
+            case WeekMenuStates.EMPTY_MENU if ValidDayStringGuard(p0).check() and not FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.EMPTY_MENU
                 return HttpException(404, "Menu not found"), next_state
 
-            case WeekMenuStates.EMPTY_MENU if FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.EMPTY_MENU if ValidDayStringGuard(p0).check() and FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.EMPTY_MENU
                 return HttpException(404, "Menu not found"), next_state
+            
+            # ----------------
 
-            case WeekMenuStates.PARTIAL_MENU if not FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.PARTIAL_MENU if not ValidDayStringGuard(p0).check():
+                next_state = WeekMenuStates.PARTIAL_MENU
+                return HttpException(400, "Bad request"), next_state
+            
+            case WeekMenuStates.PARTIAL_MENU if ValidDayStringGuard(p0).check() and not FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.PARTIAL_MENU
                 return HttpException(404, "Menu not found"), next_state
 
-            case WeekMenuStates.PARTIAL_MENU if FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.PARTIAL_MENU if ValidDayStringGuard(p0).check() and FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.PARTIAL_MENU
-
                 return LiteralOutputSymbol(registers[p0].register.food), next_state
 
-            case WeekMenuStates.FULL_MENU if not FoodForDayExistsGuard(p0).check():
+            # ----------------
+
+            case WeekMenuStates.FULL_MENU if not ValidDayStringGuard(p0).check():
+                next_state = WeekMenuStates.FULL_MENU
+                return HttpException(400, "Bad request"), next_state
+            
+            case WeekMenuStates.FULL_MENU if ValidDayStringGuard(p0).check and not FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.FULL_MENU
                 return HttpException(404, "Menu not found"), next_state
 
-            case WeekMenuStates.FULL_MENU if FoodForDayExistsGuard(p0).check():
+            case WeekMenuStates.FULL_MENU if ValidDayStringGuard(p0).check() and FoodForDayExistsGuard(p0).check():
                 next_state = WeekMenuStates.FULL_MENU
-
                 return LiteralOutputSymbol(registers[p0].register.food), next_state
 
             case _:

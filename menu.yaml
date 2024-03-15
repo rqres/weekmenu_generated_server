@@ -78,6 +78,12 @@ x-alphabet:
       asserts: # list of strings representing conditions joined by "and", i.e. all conditions must be true for the guard not to fail
         - memberOf({ $params.reqBody.day }, { ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] }) # memberOf is a built in function
         - $params.reqBody.food != "" # boolean expression - no need for built in function/keyword
+    - name: validDayString
+      params:
+        - name: day
+          type: string
+      asserts:
+        - memberOf({ $params.day }, { ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] })
     - name: foodForDayExists
       params:
         - name: day
@@ -182,7 +188,9 @@ paths:
                 "sunday",
               ]
 
-      x-guards:
+      x-guards: # order matters ! second guard will only be checked if the first one passes
+        - tries: validDayString($params.day)
+          fails: httpException(400, 'Bad request')
         - tries: foodForDayExists($params.day)
           fails: httpException(404, 'Menu not found')
 

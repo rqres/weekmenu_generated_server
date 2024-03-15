@@ -1,0 +1,128 @@
+1. built-in functions to be aware of
+  - getRegisterByKey    # returns the value held in a register by a given key
+  - setRegister         # sets the value of a register
+  - registerIsNotNull   # checks if a register has been changed since system start up
+  - memberOf            # checks if a value is a member of a list
+  - construct           # constructs an instance of an Entity from a raw object (i.e. a dictionary)
+  - getField            # gets the value of a field from an Entity
+  - httpException       # output symbol returning an HTTP exception with a given status code and message
+
+2. each transition will be duplicated to incorporate the operation-wide guards
+'x-guards' and 'x-transitions' will be converted behind the scenes
+
+`addMenuItem` is parsed to:
+
+transitions:
+  - from: EmptyMenu
+    to: PartialMenu
+    conditions:
+      - validRequest({ $requestBody })
+    update: setRegister( { getRegisterByKey({ $requestBody.day }) }, { construct({ $entities.MenuItem }, { $requestBody }) } )
+    output: getRegisterByKey({ $requestBody.day })
+  - from: EmptyMenu # (duplicate of above for failed guard)
+    to: EmptyMenu
+    conditions:
+      - not validRequest({ $requestBody })
+    output: httpException({ 400 }, { 'Bad request' })
+
+  - from: PartialMenu
+    to: FullMenu
+    conditions:
+      - validRequest({ $requestBody })
+      - registerIsNull( { getRegisterByKey({ $requestBody.day }) } )
+    update: setRegister({ getRegisterByKey({ $requestBody.day }) }, { construct({ $entities.MenuItem }, { $requestBody }) })
+    output: getRegisterByKey({ $requestBody.day })
+  - from: PartialMenu
+    to: PartialMenu
+    conditions:
+      - not validRequest({ $requestBody })
+        when adding the negated operation-wide guard, it overrides all other transition specific conditions
+        ignore everything below
+      OR
+      - registerIsNull({ getRegisterByKey({ $requestBody.day }) }) # redundant but doesn't affect the logic
+    output: httpException({ 400 }, { 'Bad request' })
+
+  - from: PartialMenu
+    to: PartialMenu
+    conditions:
+      - validRequest({ $requestBody })
+      - not registerIsNull({ getRegisterByKey({ $requestBody.day }) })
+    update: setRegister({ getRegisterByKey({ $requestBody.day }) }, { construct({ $entities.MenuItem }, { $requestBody }) })
+    output: getRegisterByKey({ $requestBody.day })
+  - from: PartialMenu
+    to: PartialMenu
+    conditions:
+      - not validRequest([ $requestBody ])
+      OR
+      - not registerIsNull({ getRegisterByKey({ $requestBody.day }) }) # redundant but doesn't affect the logic
+    output: httpException({ 400 }, { 'Bad request' })
+
+  - from: FullMenu
+    to: FullMenu
+    conditions:
+      - validRequest({ $requestBody })
+    update: setRegister({ getRegisterByKey({ $requestBody.day }) }, { construct({ $entities.MenuItem }, { $requestBody }) })
+    output: getRegisterByKey({ $requestBody.day })
+  - from: FullMenu
+    to: FullMenu
+    conditions:
+      - not validRequest({ $requestBody })
+    output: httpException({ 400 }, { 'Bad request' })
+
+
+
+`getFoodForDay` is parsed to:
+transitions:
+  - from: EmptyMenu
+    to: EmptyMenu
+    condition: not foodForDayExists({ $params.day })
+    output: httpException({ 404 }, { 'Menu not found' })
+  - from: EmptyMenu
+.   to: EmptyMenu
+    condition: foodForDayExists({ $params.day })
+    output: httpException({ 404 }, { 'Menu not found' })
+
+  - from: EmptyMenu
+    to: EmptyMenu
+    condition: not validDayString({ $params.day })
+    output: httpException({ 400 }, { 'Bad request' })
+  - from: EmptyMenu
+    to: EmptyMenu
+    condition: validDayString({ $params.day })
+    output: httpException({ 404 }, { 'Menu not found' })
+
+  - from: PartialMenu
+    to: PartialMenu
+    condition: not foodForDayExists({ $params.day })
+    output: httpException({ 404 }, { 'Menu not found' })
+  - from: PartialMenu
+    to: PartialMenu
+    condition: foodForDayExists({ $params.day })
+    output: getField({ food }, { getRegisterByKey({ $params.day }) })
+
+  - from: PartialMenu
+    to: PartialMenu
+    condition: not validDayString({ $params.day })
+    output: httpException({ 400 }, { 'Bad request' })
+  - from: PartialMenu
+    to: PartialMenu
+    condition: validDayString({ $params.day })
+    output: getField({ food }, { getRegisterByKey({ $params.day }) })
+
+  - from: FullMenu # This one might be redundant but it doesn't affect the logic
+    to: FullMenu
+    condition: not foodForDayExists({ $params.day }) # i.e. this condition is impossible to satisfy if menu is full
+    output: httpException({ 404 }, { 'Menu not found' })
+  - from: FullMenu
+    to: FullMenu
+    condition: foodForDayExists({ $params.day })
+    output: getField({ food }, { getRegisterByKey({ $params.day }) })
+
+  - from: FullMenu
+    to: FullMenu
+    condition: not validDayString({ $params.day })
+    output: httpException({ 400 }, { 'Bad request' })
+  - from: FullMenu
+    to: FullMenu
+    condition: validDayString({ $params.day })
+    output: getField({ food }, { getRegisterByKey({ $params.day }) })
